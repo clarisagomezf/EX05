@@ -12,7 +12,7 @@ output:
 
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries}
@@ -175,6 +175,7 @@ garden_harvest %>%
   * Show the time in the subtitle.  
   * CHALLENGE: use the `ggimage` package and `geom_image` to add a bike image instead of a red point. You can use [this](https://raw.githubusercontent.com/llendway/animation_and_interactivity/master/bike.png) image. See [here](https://goodekat.github.io/presentations/2019-isugg-gganimate-spooky/slides.html#35) for an example. 
   * Add something of your own! And comment on if you prefer this to the static map and why or why not.
+  I prefer the static map because it iis easier to see the entire bike route faster. 
   
 ```{r}
 mallorca_map <- get_stamenmap(
@@ -185,19 +186,20 @@ mallorca_map <- get_stamenmap(
 ggmap(mallorca_map)+
   geom_path(data= mallorca_bike_day7,
             aes(x=lon, y= lat, color= ele),
-            size=0.05,
-            by = "width")+
-  scale_size_identity()+
-  labs(title= "Mallorca biking path",
-       subtitle = "Time: {closest_time}")+
+            size=1)+
+  geom_point(data = mallorca_bike_day7, aes(x = lon, y = lat), fill= "red")+
   theme_map()+
   theme(legend.background = element_blank(),
-        legend.position = "bottom")
+        legend.position = "bottom")+
+  transition_reveal(along = time)+
+  labs(title= "Mallorca biking path",
+       subtitle = "Time: {frame_along}")
 
-# confused on what animation to add 
+anim_save("mallorca_bike.gif")
+knitr::include_graphics("mallorca_bike.gif")
 ```
-  
-  
+
+
   5. In this exercise, you get to meet my sister, Heather! She is a proud Mac grad, currently works as a Data Scientist at 3M where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files (HINT: `bind_rows()`, 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
 ```{r}
@@ -213,19 +215,17 @@ panama_races <- bind_rows(panama_bike, panama_run, panama_swim)
 
 ggmap(panama_map)+
   geom_point(data = panama_races,
-             aes(x = lon, y= lat, color= event),
+             aes(x = lon, y= lat),
              size=.5)+
-  scale_color_manual(values = c("Bike"="red",
-                                "Run"= "green",
-                                "Swim"= "blue"))+
-  labs(title = "Race Path in Panama")+
+  geom_path(data= panama_races, aes(color = ele))+
   theme_map()+
   theme(legend.background = element_blank(),
         legend.position = "bottom",
         legend.title = element_blank())+
-  transition_reveal(date)
+  transition_reveal(time)+
+  labs(title = "Race Path in Panama",
+       subtitle = "Time: {frame_along}")
 
-# confused on what animation to add 
 ```
   
 ## COVID-19 data
@@ -278,11 +278,10 @@ census_pop_est_2018 <- read_csv("https://www.dropbox.com/s/6txwv3b4ng7pepe/us_ce
 
 states_map <- map_data("state")
 
-# 
-
 covid_per_state <- covid19 %>%
-  mutate(state_name = str_to_lower(state)) %>% 
-  filter(date == "2021-06-20") # filter by every friday instead? how??
+  mutate(state_name = str_to_lower(state),
+         wday= wday(date, label = TRUE)) %>% 
+  filter(wday == "Fri")
 
 covid_with_2018_pop_est <-
   covid_per_state %>% 
@@ -290,20 +289,21 @@ covid_with_2018_pop_est <-
             by = c("state_name" = "state")) %>% 
   mutate(covid_per_10000 = (cases/est_pop_2018)*10000)
 
-covid_anim2 <- covid_with_2018_pop_est %>% 
-  ggplot(aes(x=cases, y = covid_per_10000, color=state, group= date))+
-  geom_path()+
-  geom_point(size = 2.5)+
-  geom_text(aes(label = state),
-            check_overlap = TRUE)+
-  labs(x = 'Cases',
-       y= "",
-       title = "Covid Cases per 10.000 people",
-       subtitle = "Date: {frame_along}")+
-  theme(legend.position = "none")+
-  transition_reveal(date)
+states_map <- map_data("state")
 
-animate(covid_anim2, duration= 30, nframes=200)
+covid_with_2018_pop_est %>% 
+  ggplot() +
+  geom_map(map = states_map,
+           aes(map_id = state_name,
+               fill = covid_per_10000, 
+               group = date)) +
+  expand_limits(x = states_map$long, y = states_map$lat) + 
+  theme_map()+
+  transition_states(date, transition_length = 0)+
+  labs(title="covid cases per 10.000 people")
+       #subtitle = "Date: {frame_along}")
+
+anim_save("covid_ani.gif")
 ```
 
 ## Your first `shiny` app (for next week!)
